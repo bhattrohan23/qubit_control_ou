@@ -36,6 +36,13 @@ def get_plot_elem_names(env_name):
             "noise-amp",
             "noise-freq",
         ],
+        "qubit_control": [
+            "fidelity",
+            "mean-omega-x",
+            "mean-delta",
+            "smoothness-penalty",
+            "amp-penalty",
+        ],
     }
 
     try:
@@ -142,6 +149,20 @@ def get_rydberg_two_params(args):
         "r_dissipation": 0.001,
         "dim": 2,
         "noise": args.noise,
+    }
+
+#for my qubit control specifically --> includes smoothness and amplitude constraints (penalties that keep the generated pulse sequence physical)
+def get_qubit_control_params(args):
+    return {
+        "tau": args.tau,
+        "s": args.s,
+        "dt": 0.01,
+        "N": 1000,
+        "omega_max": args.omega_max,
+        "lambda_amp": args.lambda_amp,
+        "lambda_smooth": args.lambda_smooth,
+        "w_F": args.w_F,
+        "noise_window": args.noise_window,
     }
 
 

@@ -7,7 +7,7 @@ from diffrax import (
     LinearInterpolation,
 )
 
-
+#for during training, my file ou_noise_trajectory.py is simple characterization
 def ou_process(key, steps, alpha, mu, sigma):
     """ Generate an Ornstein-Uhlenbeck process sample. 
     input arguments:

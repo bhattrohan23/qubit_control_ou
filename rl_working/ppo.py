@@ -1,13 +1,16 @@
-from jax.lib import xla_bridge
+import sys
+import os
+
+# Must happen before JAX initializes
+if "--cpu" in sys.argv:
+    os.environ["JAX_PLATFORMS"] = "cpu"
+    sys.argv.remove("--cpu")
 
 print("Platform used: ")
-print(xla_bridge.get_backend().platform)
 
 import time
 import jax
 import wandb
-import os
-import sys
 
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), ".."))
 if parent_dir not in sys.path:
@@ -31,13 +34,17 @@ import chex
 import pickle
 
 from rl_working.envs.utils.wrappers import VecEnv, LogWrapper
-from rl_working.envs.single_rydberg_env import RydbergEnv
-from rl_working.envs.single_stirap_env import SimpleStirap
-from rl_working.envs.multistep_stirap_env import MultiStirap
-from rl_working.envs.single_rydberg_two_photon_env import RydbergTwoEnv
-from rl_working.envs.single_transmon_reset_env import TransmonResetEnv
+from rl_working.envs.qubit_control_env import QubitControlEnv
+try:
+    from rl_working.envs.single_rydberg_env import RydbergEnv
+    from rl_working.envs.single_stirap_env import SimpleStirap
+    from rl_working.envs.multistep_stirap_env import MultiStirap
+    from rl_working.envs.single_rydberg_two_photon_env import RydbergTwoEnv
+    from rl_working.envs.single_transmon_reset_env import TransmonResetEnv
+except ImportError as e:
+    print(f"Warning: optional env dependencies missing ({e}). Only qubit_control available.")
 
-from rl_working.env_configs.configs import get_plot_elem_names, get_simple_stirap_params, get_multi_stirap_params, get_rydberg_cz_params, get_rydberg_two_params, get_transmon_reset_params
+from rl_working.env_configs.configs import get_plot_elem_names, get_simple_stirap_params, get_multi_stirap_params, get_rydberg_cz_params, get_rydberg_two_params, get_transmon_reset_params, get_qubit_control_params
 import matplotlib.pyplot as plt
 import argparse
 
@@ -53,13 +60,17 @@ else:
     processor = "cpu"
     default_dtype = jnp.float64
 
-envs_class_dict = {
-    "simple_stirap": SimpleStirap,
-    "multi_stirap": MultiStirap,
-    "rydberg": RydbergEnv,
-    "rydberg_two": RydbergTwoEnv,
-    "transmon_reset": TransmonResetEnv,
-}
+envs_class_dict = {"qubit_control": QubitControlEnv}
+try:
+    envs_class_dict.update({
+        "simple_stirap": SimpleStirap,
+        "multi_stirap": MultiStirap,
+        "rydberg": RydbergEnv,
+        "rydberg_two": RydbergTwoEnv,
+        "transmon_reset": TransmonResetEnv,
+    })
+except NameError:
+    pass
 
 
 class SeparateActorCritic(nn.Module):
@@ -206,12 +217,12 @@ def PPO_make_train(config):
         if config["ANNEAL_LR"]:
             tx = optax.chain(
                 optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
-                optax.adam(learning_rate=linear_schedule, eps=1e-5),
+                optax.adam(learning_rate=linear_schedule, b1=0.9, b2=0.9, eps=1e-5),
             )
         else:
             tx = optax.chain(
                 optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
-                optax.adam(config["LR"], eps=1e-5),
+                optax.adam(config["LR"], b1=0.9, b2=0.9, eps=1e-5),
             )
         train_state = TrainState.create(
             apply_fn=network.apply,
@@ -406,7 +417,11 @@ def PPO_make_train(config):
                     std_fidelity = jnp.std(info["fid"])
 
                     speed_1k = (time.time() - start_time) * 1e3 / timestep
-                    print(f"time per 1k steps: {speed_1k} seconds")
+
+                    total_loss = float(jnp.mean(jnp.ravel(loss_info[0])))
+                    value_loss = float(jnp.mean(jnp.ravel(loss_info[1][0])))
+                    actor_loss = float(jnp.mean(jnp.ravel(loss_info[1][1])))
+                    entropy    = float(jnp.mean(jnp.ravel(loss_info[1][2])))
 
                     wandb_log_dict = {
                         "timestep": timestep,
@@ -414,10 +429,10 @@ def PPO_make_train(config):
                         f"max_fidelity": max_fidelity,
                         f"min_fidelity": min_fidelity,
                         f"std_fidelity": std_fidelity,
-                        f"total_loss": jnp.mean(jnp.ravel(loss_info[0])),
-                        f"value_loss": jnp.mean(jnp.ravel(loss_info[1][0])),
-                        f"actor_loss": jnp.mean(jnp.ravel(loss_info[1][1])),
-                        f"entropy": jnp.mean(jnp.ravel(loss_info[1][2])),
+                        f"total_loss": total_loss,
+                        f"value_loss": value_loss,
+                        f"actor_loss": actor_loss,
+                        f"entropy": entropy,
                     }
 
                     if (wandb.run and timestep %
@@ -478,21 +493,48 @@ def PPO_make_train(config):
                         if config.get("LOG_WAND"):
                             wandb_log_dict[f"action_fig"] = wandb.Image(fpath)
 
+                    ep_metrics = {}
                     for log_elem in info.keys():
                         if "returned_episode" not in log_elem:
                             continue
-
-                        return_values = info[log_elem][
-                            info["returned_episode"]]
-
+                        return_values = info[log_elem][info["returned_episode"]]
                         log_val_name = log_elem.split("_")[-1]
+                        mean_value = float(np.mean(return_values))
+                        ep_metrics[log_val_name] = mean_value
+                        wandb_log_dict[f"episodic_{log_val_name}_mean"] = mean_value
 
-                        mean_value = np.mean(return_values)
-                        print(
-                            f"global step={timestep}, episodic {log_val_name} mean={mean_value}"
-                        )
-                        wandb_log_dict[
-                            f"episodic_{log_val_name}_mean"] = mean_value
+                    # Pretty-print a consolidated update block
+                    update_num = step // config["LOG_FREQ"]
+                    fid     = ep_metrics.get("fidelity", float("nan"))
+                    ret     = ep_metrics.get("returns",  float("nan"))
+                    amp_pen = ep_metrics.get("amp-penalty",    float("nan"))
+                    smo_pen = ep_metrics.get("smoothness-penalty", float("nan"))
+                    omegax  = ep_metrics.get("mean-omega-x",   float("nan"))
+                    delta   = ep_metrics.get("mean-delta",      float("nan"))
+                    W = 54
+                    bar = "─" * W
+                    fid_bar = "█" * int(fid * 20) + "░" * (20 - int(fid * 20)) if 0 <= fid <= 1 else ""
+                    print(f"\n┌{bar}┐")
+                    print(f"│ Update {update_num:>4}  │  Step {timestep:>9,}  │  {speed_1k:.4f} s / 1k steps{'':<3}│")
+                    print(f"├{bar}┤")
+                    print(f"│ {'PERFORMANCE':<{W-2}} │")
+                    print(f"│   Fidelity   {fid:>7.4f}  [{fid_bar}]{'':<{W - 37}} │")
+                    print(f"│   Return     {ret:>+10.3f}{'':<{W - 26}} │")
+                    print(f"│   Fid range  {float(min_fidelity):.4f} – {float(max_fidelity):.4f}  (σ={float(std_fidelity):.4f}){'':<{W - 44}} │")
+                    print(f"├{bar}┤")
+                    print(f"│ {'REWARD BREAKDOWN':<{W-2}} │")
+                    print(f"│   Amplitude penalty   {amp_pen:>8.3f}{'':<{W - 34}} │")
+                    print(f"│   Smoothness penalty  {smo_pen:>8.3f}{'':<{W - 34}} │")
+                    print(f"├{bar}┤")
+                    print(f"│ {'CONTROL SIGNAL':<{W-2}} │")
+                    print(f"│   Mean |ω_x|  {omegax:>10.2f}{'':<{W - 28}} │")
+                    print(f"│   Mean |δ|    {delta:>10.2f}{'':<{W - 28}} │")
+                    print(f"├{bar}┤")
+                    print(f"│ {'PPO LOSSES':<{W-2}} │")
+                    print(f"│   Total    {total_loss:>10.5f}  │  Value  {value_loss:>10.5f}{'':<{W - 43}} │")
+                    print(f"│   Actor    {actor_loss:>10.5f}  │  Entropy {entropy:>9.5f}{'':<{W - 43}} │")
+                    print(f"└{bar}┘")
+
                     if config.get("LOG_WAND"):
                         if wandb.run:
                             wandb.log(wandb_log_dict)
@@ -515,14 +557,20 @@ def PPO_make_train(config):
                             with open(data_fpath, "wb") as file:
                                 pickle.dump([], file)
 
+                        # fid has shape (NUM_STEPS, NUM_ENVS); only the final
+                        # step is non-zero, so use [-1] to get true episode fidelity
+                        terminal_fid = info["fid"][-1]
                         # Create data entry
                         data_entry = {
                             "timestep": timestep,
                             "mean_reward": jnp.mean(info["reward"]),
-                            "mean_fidelity": jnp.mean(info["fid"]),
-                            "max_fidelity": jnp.max(info["fid"]),
-                            "min_fidelity": jnp.min(info["fid"]),
-                            "std_fidelity": jnp.std(info["fid"]),
+                            "mean_fidelity": jnp.mean(terminal_fid),
+                            "max_fidelity": jnp.max(terminal_fid),
+                            "min_fidelity": jnp.min(terminal_fid),
+                            "std_fidelity": jnp.std(terminal_fid),
+                            "fraction_solved": jnp.mean(terminal_fid > 0.5),
+                            "mean_omega_x": jnp.mean(info["mean-omega-x"]),
+                            "std_omega_x": jnp.std(info["mean-omega-x"]),
                         }
 
                         # Append data to the PKL file
@@ -556,6 +604,10 @@ if __name__ == "__main__":
                         type=int,
                         default=10,
                         help="Initial seed for the run")
+    parser.add_argument("--local_save_name",
+                        type=str,
+                        default="local_save",
+                        help="Suffix for the local pkl save file")
 
     parser.add_argument("--lr", type=float, default=5e-4, help="Learning rate")
     parser.add_argument("--num_envs",
@@ -575,17 +627,35 @@ if __name__ == "__main__":
 
     #CHOOSE ENVIRONMENT
     parser.add_argument(
-        "--env",
+        "--env", "--env_name",
+        dest="env",
         choices=[
             "multi_stirap",
             "simple_stirap",
             "rydberg",
             "rydberg_two",
             "transmon_reset",
+            "qubit_control",
         ],
         default="simple_stirap",
         help="Environment to run",
     )
+
+    #QUBIT CONTROL PARAMS
+    parser.add_argument("--tau", type=float, default=1.0,
+                        help="OU correlation time")
+    parser.add_argument("--s", type=float, default=0.5,
+                        help="Steady-state noise std")
+    parser.add_argument("--noise_window", type=int, default=0,
+                        help="Noise history window size (0=memoryless, k>0=context-aware)")
+    parser.add_argument("--omega_max", type=float, default=2.0,
+                        help="Max drive amplitude")
+    parser.add_argument("--lambda_amp", type=float, default=0.01,
+                        help="Amplitude penalty weight")
+    parser.add_argument("--lambda_smooth", type=float, default=0.01,
+                        help="Smoothness penalty weight")
+    parser.add_argument("--w_F", type=float, default=1.0,
+                        help="Terminal fidelity reward weight")
 
     #NOISE PARAMS
     parser.add_argument(
@@ -786,7 +856,7 @@ if __name__ == "__main__":
         "LOG_FREQ": 1,
         "LOG_WAND": False,
         "LOCAL_LOGGING": True,
-        "LOCAL_SAVE_NAME": "local_save",
+        "LOCAL_SAVE_NAME": args.local_save_name,
         "MU_PHASE": args.mu_phase,
         "MU_AMP": args.mu_amp,
         "ALPHA_PHASE": 0.1,
@@ -819,17 +889,26 @@ if __name__ == "__main__":
         config["ENV_PARAMS"] = get_transmon_reset_params(args)
         print(config["ENV_PARAMS"])
 
+    elif config["ENV_NAME"] == "qubit_control":
+        config["ENV_PARAMS"] = get_qubit_control_params(args)
+        config["NUM_STEPS"] = 1000
+        config["GAMMA"] = 0.999
+        config["MINIBATCH_SIZE"] = (
+            config["NUM_ENVS"] * config["NUM_STEPS"] // config["NUM_MINIBATCHES"]
+        )
+
     else:
         raise ValueError("Environment not recognized")
 
-    config["ENV_PARAMS"]["ou_noise_params"] = [
-        config["MU_PHASE"],
-        config["MU_AMP"],
-        config["ALPHA_PHASE"],
-        config["ALPHA_AMP"],
-        config["SIGMA_PHASE"],
-        config["SIGMA_AMP"],
-    ]
+    if config["ENV_NAME"] != "qubit_control":
+        config["ENV_PARAMS"]["ou_noise_params"] = [
+            config["MU_PHASE"],
+            config["MU_AMP"],
+            config["ALPHA_PHASE"],
+            config["ALPHA_AMP"],
+            config["SIGMA_PHASE"],
+            config["SIGMA_AMP"],
+        ]
 
     if config["DEBUG_NOJIT"]:
         jax.disable_jit(disable=True)
