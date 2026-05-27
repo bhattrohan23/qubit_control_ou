@@ -1,3 +1,25 @@
+My experiments:
+Project: RL control of single-qubit state transfer under OU detuning noise
+
+Overview:
+This repository contains code for training and evaluating PPO agents for single-qubit |0> to |1> state transfer under Ornstein-Uhlenbeck detuning noise.
+
+Main components:
+- qubit_control_env.py: JAX environment for noisy qubit state transfer.
+- qubit_stepper.py: Hamiltonian time evolution and fidelity calculation.
+- ppo.py: PPO training loop.
+- evaluate_qubit.py / eval_frozen_policy.py: frozen-policy evaluation on fresh OU noise trajectories.
+- analysis scripts: parse evaluation outputs and compute final-checkpoint, best-snapshot, paired-seed, IQM, and performance-profile metrics.
+
+Experiments:
+- k-sweep: memoryless vs context-aware agents with different noise-history windows.
+- tau-sweep: OU correlation-time sweep across fast, intermediate, and quasi-static noise regimes.
+- final-checkpoint evaluation across seeds 42–49 for tau=10.
+- preliminary best-snapshot/debiased analysis for validation-checkpoint selection.
+
+Status:
+Final-checkpoint evaluation does not show a consistent CA50 advantage, but best-snapshot analysis suggests CA50 may more often discover strong intermediate policies. The next proposed experiment is validation-based checkpoint selection with fresh re-evaluation.
+
 # RL4qcWpc
 
 [![Generic badge](https://img.shields.io/badge/arXiv-2305.04899-<COLOR>.svg)](https://arxiv.org/abs/2501.14372)
