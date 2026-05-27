@@ -1,0 +1,16 @@
+RUN: retrain_memoryless_tau0.3_seed42
+Training log: episodic_data/qubit_control/qubit_control_retrain_memoryless_tau0.3_seed42.pkl
+Total updates logged: 5019
+Final timestep:       304,000
+Finished (>=10000):   NO (5019)
+
+--- TRAINING CURVE SUMMARY ---
+Final mean_fidelity:      0.97507
+Peak  mean_fidelity:      0.99429
+Tail  mean_fidelity (last 200): 0.88191 ± 0.08862
+Final fraction_solved:    1.00000
+Tail  fraction_solved (last 200): 0.96969
+Mean |ω_x| (all):        0.32275
+Mean |ω_x| (last 200):   0.45247
+
+--- FROZEN-POLICY EVAL: missing (no _eval.pkl) ---

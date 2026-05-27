@@ -91,6 +91,99 @@ def evaluate_policy(network, network_params, env: QubitControlEnv,
     return np.array(fidelities)
 
 
+def build_fast_eval_fn(network, env: QubitControlEnv, stochastic: bool = False):
+    """Return a JIT'd eval function with signature:
+
+        eval_fn(network_params, keys) -> dict of shape-(N_eval,) arrays
+
+    where keys has shape (N_eval, 2).  network_params is passed at call time so
+    the same compiled function can be reused across training steps.
+
+    stochastic=False  →  pi.mode()   (deterministic, cleaner for thesis)
+    stochastic=True   →  pi.sample() (explores policy variance)
+
+    Returned dict keys:
+        fidelity, cumulative_reward, mean_action_mag, action_smoothness,
+        omega_over_pi  (= mean|ω_x| / ω_π, where ω_π = π / T_gate)
+    """
+    env_params = env.default_params
+    N = env._N
+    T_gate = float(N * env_params.dt)       # = 10.0 for qubit_control
+    omega_pi_ref = jnp.pi / T_gate          # pi-pulse reference amplitude
+
+    def single_rollout(network_params, key):
+        if stochastic:
+            key_reset, key_actions = jax.random.split(key)
+            step_keys = jax.random.split(key_actions, N)
+        else:
+            key_reset = key
+            step_keys = jnp.zeros((N, 2), dtype=jnp.uint32)  # unused
+
+        obs, state = env.reset_env(key_reset, env_params)
+
+        def step_fn(carry, step_key):
+            st, ob = carry
+            pi, _ = network.apply(network_params, ob)
+            if stochastic:
+                action = jnp.clip(pi.sample(seed=step_key), -1.0, 1.0)
+            else:
+                action = jnp.clip(pi.mode(), -1.0, 1.0)
+            new_ob, new_st, reward, _, _ = env.step_env(
+                jax.random.PRNGKey(0), st, action, env_params
+            )
+            return (new_st, new_ob), (action[0], reward)
+
+        (final_state, _), (actions_norm, rewards) = jax.lax.scan(
+            step_fn, (state, obs), step_keys, length=N
+        )
+
+        scaled = actions_norm * env_params.omega_max
+        return {
+            "fidelity":          final_state.fidelity,
+            "cumulative_reward": jnp.sum(rewards),
+            "mean_action_mag":   jnp.mean(jnp.abs(scaled)),
+            "action_smoothness": jnp.mean(jnp.diff(scaled) ** 2),
+            "omega_over_pi":     jnp.mean(jnp.abs(scaled)) / omega_pi_ref,
+        }
+
+    @jax.jit
+    def eval_fn(network_params, keys):
+        return jax.vmap(lambda k: single_rollout(network_params, k))(keys)
+
+    return eval_fn
+
+
+def compute_eval_metrics(results: dict) -> dict:
+    """Compute all summary statistics from vmapped rollout results.
+
+    Args:
+        results: dict of (N_eval,) arrays from build_fast_eval_fn output.
+
+    Returns:
+        dict of scalar metrics matching the eval logging keys in ppo.py.
+    """
+    F = np.asarray(results["fidelity"])
+    R = np.asarray(results["cumulative_reward"])
+    A = np.asarray(results["mean_action_mag"])
+    S = np.asarray(results["action_smoothness"])
+    O = np.asarray(results["omega_over_pi"])
+    return {
+        "eval_F_mean":           float(np.mean(F)),
+        "eval_F_std":            float(np.std(F)),
+        "eval_F_median":         float(np.median(F)),
+        "eval_F_25":             float(np.percentile(F, 25)),
+        "eval_F_10":             float(np.percentile(F, 10)),
+        "eval_F_min":            float(np.min(F)),
+        "eval_success_09":       float(np.mean(F > 0.90)),
+        "eval_success_095":      float(np.mean(F > 0.95)),
+        "eval_success_099":      float(np.mean(F > 0.99)),
+        "eval_cumulative_reward": float(np.mean(R)),
+        "eval_omega_mean":       float(np.mean(A)),
+        "eval_omega_over_pi":    float(np.mean(O)),
+        "eval_action_smoothness": float(np.mean(S)),
+    }
+
+
 def evaluate_pi_pulse(env: QubitControlEnv, n_episodes: int,
                       rng: jax.Array) -> np.ndarray:
     """Run constant pi-pulse baseline for n_episodes.

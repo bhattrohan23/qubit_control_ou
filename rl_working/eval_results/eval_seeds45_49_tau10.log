@@ -1,0 +1,264 @@
+JAX devices: [CpuDevice(id=0)]
+Evaluating 10 checkpoint(s) with n_eval=5000
+
+Building eval fn for qubit_control_context50_tau10_seed45.pkl …
+  Done in 3.7s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_context50_tau10_seed45                     │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.48954   ±  0.22285                │
+│   Median         0.49154                                 │
+│   p10            0.17010                                 │
+│   p25            0.33271                                 │
+│   Min            0.00124                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.00000                                 │
+│   P(F > 0.95)    0.00000                                 │
+│   P(F > 0.99)    0.00000                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.1790                                 │
+│   Smoothness      0.0000                                 │
+│   Mean Σreward     0.399                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_context50_tau10_seed45.pkl
+
+Building eval fn for qubit_control_context50_tau10_seed46.pkl …
+  Done in 3.6s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_context50_tau10_seed46                     │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.85311   ±  0.19024                │
+│   Median         0.92846                                 │
+│   p10            0.56862                                 │
+│   p25            0.81734                                 │
+│   Min            0.01464                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.59520                                 │
+│   P(F > 0.95)    0.41640                                 │
+│   P(F > 0.99)    0.15560                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.3206                                 │
+│   Smoothness      0.0000                                 │
+│   Mean Σreward     1.304                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_context50_tau10_seed46.pkl
+
+Building eval fn for qubit_control_context50_tau10_seed47.pkl …
+  Done in 3.5s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_context50_tau10_seed47                     │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.72789   ±  0.23543                │
+│   Median         0.79957                                 │
+│   p10            0.34963                                 │
+│   p25            0.57562                                 │
+│   Min            0.00961                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.31280                                 │
+│   P(F > 0.95)    0.17680                                 │
+│   P(F > 0.99)    0.03980                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.2713                                 │
+│   Smoothness      0.0000                                 │
+│   Mean Σreward     0.815                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_context50_tau10_seed47.pkl
+
+Building eval fn for qubit_control_context50_tau10_seed48.pkl …
+  Done in 3.5s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_context50_tau10_seed48                     │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.58796   ±  0.28316                │
+│   Median         0.61537                                 │
+│   p10            0.18101                                 │
+│   p25            0.35228                                 │
+│   Min            0.00026                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.18580                                 │
+│   P(F > 0.95)    0.11700                                 │
+│   P(F > 0.99)    0.02760                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.2533                                 │
+│   Smoothness      0.0000                                 │
+│   Mean Σreward     0.460                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_context50_tau10_seed48.pkl
+
+Building eval fn for qubit_control_context50_tau10_seed49.pkl …
+  Done in 3.6s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_context50_tau10_seed49                     │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.87908   ±  0.18608                │
+│   Median         0.96333                                 │
+│   p10            0.62489                                 │
+│   p25            0.85376                                 │
+│   Min            0.03057                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.67860                                 │
+│   P(F > 0.95)    0.55520                                 │
+│   P(F > 0.99)    0.29360                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.3026                                 │
+│   Smoothness      0.0000                                 │
+│   Mean Σreward     1.770                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_context50_tau10_seed49.pkl
+
+Building eval fn for qubit_control_memoryless_tau10_seed45.pkl …
+  Done in 6.6s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_memoryless_tau10_seed45                    │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.94299   ±  0.09814                │
+│   Median         0.98573                                 │
+│   p10            0.82412                                 │
+│   p25            0.93394                                 │
+│   Min            0.23463                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.81940                                 │
+│   P(F > 0.95)    0.70080                                 │
+│   P(F > 0.99)    0.45580                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.3512                                 │
+│   Smoothness      0.0000                                 │
+│   Mean Σreward       nan                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_memoryless_tau10_seed45.pkl
+
+Building eval fn for qubit_control_memoryless_tau10_seed46.pkl …
+  Done in 7.3s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_memoryless_tau10_seed46                    │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.88267   ±  0.19529                │
+│   Median         0.99589                                 │
+│   p10            0.56851                                 │
+│   p25            0.84647                                 │
+│   Min            0.02543                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.69200                                 │
+│   P(F > 0.95)    0.61820                                 │
+│   P(F > 0.99)    0.53200                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.4337                                 │
+│   Smoothness      0.0001                                 │
+│   Mean Σreward       nan                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_memoryless_tau10_seed46.pkl
+
+Building eval fn for qubit_control_memoryless_tau10_seed47.pkl …
+  Done in 6.7s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_memoryless_tau10_seed47                    │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.51305   ±  0.30311                │
+│   Median         0.48212                                 │
+│   p10            0.11859                                 │
+│   p25            0.23898                                 │
+│   Min            0.00723                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.15580                                 │
+│   P(F > 0.95)    0.09460                                 │
+│   P(F > 0.99)    0.02260                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.2196                                 │
+│   Smoothness      0.0000                                 │
+│   Mean Σreward     0.400                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_memoryless_tau10_seed47.pkl
+
+Building eval fn for qubit_control_memoryless_tau10_seed48.pkl …
+  Done in 7.2s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_memoryless_tau10_seed48                    │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.77685   ±  0.17129                │
+│   Median         0.79818                                 │
+│   p10            0.53403                                 │
+│   p25            0.65493                                 │
+│   Min            0.12694                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.31640                                 │
+│   P(F > 0.95)    0.20500                                 │
+│   P(F > 0.99)    0.07020                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.2680                                 │
+│   Smoothness      0.0000                                 │
+│   Mean Σreward     1.190                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_memoryless_tau10_seed48.pkl
+
+Building eval fn for qubit_control_memoryless_tau10_seed49.pkl …
+  Done in 7.3s
+
+┌──────────────────────────────────────────────────────────┐
+│ qubit_control_memoryless_tau10_seed49                    │
+│ n_eval = 5000                                           │
+├──────────────────────────────────────────────────────────┤
+│ FIDELITY STATISTICS                                      │
+│   E[F]           0.85750   ±  0.13628                │
+│   Median         0.90584                                 │
+│   p10            0.66693                                 │
+│   p25            0.79803                                 │
+│   Min            0.12204                                 │
+├──────────────────────────────────────────────────────────┤
+│ ROBUSTNESS                                               │
+│   P(F > 0.90)    0.52020                                 │
+│   P(F > 0.95)    0.30820                                 │
+│   P(F > 0.99)    0.00500                                 │
+├──────────────────────────────────────────────────────────┤
+│ CONTROL SIGNAL                                           │
+│   Mean |ω_x|      0.3126                                 │
+│   Smoothness      0.0000                                 │
+│   Mean Σreward     1.088                                 │
+└──────────────────────────────────────────────────────────┘
+  Saved → eval_results/eval_qubit_control_memoryless_tau10_seed49.pkl
+
+Summary CSV → eval_results/eval_summary.csv

@@ -55,7 +55,7 @@ if "cuda" in str(jax.devices()):
     default_dtype = jnp.float32
 else:
     jax.config.update("jax_platform_name", "cpu")
-    print("Not connected to a GPU")
+    #print("Not connected to a GPU")
     jax.config.update("jax_enable_x64", True)
     processor = "cpu"
     default_dtype = jnp.float64
@@ -195,6 +195,22 @@ def PPO_make_train(config):
     env = LogWrapper(env)
     env = VecEnv(env)
     env_params = env.default_params
+
+    # --- frozen-policy eval setup (qubit_control only) ---
+    _eval_fn_det = None
+    _eval_fn_stoch = None
+    _eval_rng_state = [None]
+    if config.get("DO_EVAL") and config["ENV_NAME"] == "qubit_control":
+        from rl_working.evaluate_qubit import build_fast_eval_fn, compute_eval_metrics as _compute_eval_metrics
+        _raw_env = envs_class_dict["qubit_control"](**config["ENV_PARAMS"])
+        _eval_network = CombinedActorCritic(
+            _raw_env.action_space(_raw_env.default_params).shape[0],
+            activation=config["ACTIVATION"],
+            layer_size=config["LAYER_SIZE"],
+        )
+        _eval_fn_det   = build_fast_eval_fn(_eval_network, _raw_env, stochastic=False)
+        _eval_fn_stoch = build_fast_eval_fn(_eval_network, _raw_env, stochastic=True)
+        _eval_rng_state[0] = jax.random.PRNGKey(config.get("EVAL_SEED", 98765))
 
     def linear_schedule(count):
         frac = (1.0 - (count //
@@ -405,7 +421,7 @@ def PPO_make_train(config):
             if config.get("LOGGING"):
 
                 def callback(infos):
-                    info, loss_info, step = infos
+                    info, loss_info, step, params = infos
                     timesteps = (info["timestep"][info["returned_episode"]] *
                                  config["NUM_ENVS"])
                     if step % config["LOG_FREQ"] != 0:
@@ -447,8 +463,9 @@ def PPO_make_train(config):
                         saved_elem = []
                         # if wandb.run and timestep % (config["LOG_FREQ"] * 10) == 0:
                         for elem_i, elem_name in enumerate(elem_names):
-                            best_elem = info[elem_name][info["fid"] ==
-                                                        max_fidelity][0]
+                            best_elem = np.atleast_1d(
+                                info[elem_name][info["fid"] ==
+                                               max_fidelity][0])
                             saved_elem.append(best_elem)
                             x_values = np.linspace(0, 1, len(best_elem))
                             ax[elem_i].plot(x_values, best_elem)
@@ -581,7 +598,57 @@ def PPO_make_train(config):
                             pickle.dump(
                                 data, file)  # Overwrite file with updated list
 
-                jax.debug.callback(callback, (metric, loss_info, step))
+                    # --- frozen-policy eval (every EVAL_FREQ updates + final) ---
+                    if _eval_fn_det is not None:
+                        is_eval_step  = (int(step) % config["EVAL_FREQ"] == 0)
+                        is_final_step = (int(step) == config["NUM_UPDATES"])
+                        if is_eval_step or is_final_step:
+                            n_eval = config["N_EVAL_FINAL"] if is_final_step else config["N_EVAL"]
+                            _eval_rng, _eval_key = jax.random.split(_eval_rng_state[0])
+                            _eval_rng_state[0] = _eval_rng
+                            eval_keys = jax.random.split(_eval_key, n_eval)
+
+                            # params arrive as numpy from callback — put back on device
+                            jax_params = jax.tree_util.tree_map(jnp.array, params)
+                            det_raw = jax.block_until_ready(_eval_fn_det(jax_params, eval_keys))
+                            det_m   = _compute_eval_metrics(det_raw)
+
+                            label = "FINAL FROZEN-POLICY EVAL" if is_final_step else f"FROZEN-POLICY EVAL"
+                            W2 = 54
+                            bar2 = "─" * W2
+                            print(f"\n┌{bar2}┐")
+                            print(f"│ {label:<{W2-1}}│")
+                            print(f"│ {'update ' + str(int(step)) + '  |  det. policy  |  ' + str(n_eval) + ' episodes':<{W2-1}}│")
+                            print(f"├{bar2}┤")
+                            print(f"│   E[F]         {det_m['eval_F_mean']:>7.5f}  ±  {det_m['eval_F_std']:.5f}{'':>{W2-41}}│")
+                            print(f"│   Median / p25 {det_m['eval_F_median']:>7.5f}  /  {det_m['eval_F_25']:.5f}{'':>{W2-41}}│")
+                            print(f"│   p10 / min    {det_m['eval_F_10']:>7.5f}  /  {det_m['eval_F_min']:.5f}{'':>{W2-41}}│")
+                            print(f"│   P(F>0.90)    {det_m['eval_success_09']:>7.5f}{'':>{W2-22}}│")
+                            print(f"│   P(F>0.95)    {det_m['eval_success_095']:>7.5f}{'':>{W2-22}}│")
+                            print(f"│   P(F>0.99)    {det_m['eval_success_099']:>7.5f}{'':>{W2-22}}│")
+                            print(f"│   ω_mean / ωπ  {det_m['eval_omega_mean']:>7.4f}  /  {det_m['eval_omega_over_pi']:.4f}{'':>{W2-41}}│")
+                            print(f"└{bar2}┘")
+
+                            if config.get("LOG_WAND") and wandb.run:
+                                wandb.log({"timestep": timestep,
+                                           **{f"det_{k}": v for k, v in det_m.items()}})
+
+                            if config.get("LOCAL_LOGGING"):
+                                eval_fpath = os.path.join(
+                                    f"episodic_data/{config['ENV_NAME']}",
+                                    f"{config['ENV_NAME']}_{config['LOCAL_SAVE_NAME']}_eval.pkl",
+                                )
+                                prev = []
+                                if os.path.exists(eval_fpath):
+                                    with open(eval_fpath, "rb") as _f:
+                                        prev = pickle.load(_f)
+                                prev.append({"timestep": timestep, "n_eval": n_eval,
+                                             "det": det_m,
+                                             "fidelities": np.asarray(det_raw["fidelity"])})
+                                with open(eval_fpath, "wb") as _f:
+                                    pickle.dump(prev, _f)
+
+                jax.debug.callback(callback, (metric, loss_info, step, train_state.params))
 
             runner_state = (train_state, env_state, last_obs, step, rng)
             return runner_state, metric
@@ -827,6 +894,12 @@ if __name__ == "__main__":
         default=-10.0,
         help="Penalty for exceeding the maximum number of steps",
     )
+    parser.add_argument(
+        "--log_wand",
+        action="store_true",
+        default=False,
+        help="Enable WandB logging",
+    )
 
     args = parser.parse_args()
 
@@ -854,7 +927,7 @@ if __name__ == "__main__":
         "DEBUG_NOJIT": False,
         "LOGGING": True,
         "LOG_FREQ": 1,
-        "LOG_WAND": False,
+        "LOG_WAND": args.log_wand,
         "LOCAL_LOGGING": True,
         "LOCAL_SAVE_NAME": args.local_save_name,
         "MU_PHASE": args.mu_phase,
@@ -896,6 +969,10 @@ if __name__ == "__main__":
         config["MINIBATCH_SIZE"] = (
             config["NUM_ENVS"] * config["NUM_STEPS"] // config["NUM_MINIBATCHES"]
         )
+        config["DO_EVAL"] = True
+        config["EVAL_FREQ"] = 500      # deterministic eval every 500 updates
+        config["N_EVAL"] = 256         # episodes during training
+        config["N_EVAL_FINAL"] = 5000  # episodes at final update
 
     else:
         raise ValueError("Environment not recognized")
@@ -928,6 +1005,27 @@ if __name__ == "__main__":
 
     #ADD YOUR OWN WAND CONFIG HERE
     if config["LOG_WAND"]:
-        wandb.init(project="", entity="", config=config)
+        wandb.init(project="qubit-control-ou", entity="rohanbhatt", config=config)
 
     outs = jax.block_until_ready(single_train(rng))
+
+    if config.get("LOCAL_LOGGING"):
+        ckpt_dir = os.path.join("checkpoints", config["ENV_NAME"])
+        os.makedirs(ckpt_dir, exist_ok=True)
+        ckpt_path = os.path.join(
+            ckpt_dir,
+            f"{config['ENV_NAME']}_{config['LOCAL_SAVE_NAME']}.pkl",
+        )
+        train_state = outs["runner_state"][0]
+        ckpt_data = {
+            "params": train_state.params,
+            "env_params": config["ENV_PARAMS"],
+            "network_cfg": {
+                "activation": config["ACTIVATION"],
+                "layer_size": config["LAYER_SIZE"],
+                "action_dim": 1,
+            },
+        }
+        with open(ckpt_path, "wb") as _f:
+            pickle.dump(ckpt_data, _f)
+        print(f"Checkpoint saved → {ckpt_path}")
